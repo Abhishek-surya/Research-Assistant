@@ -27,12 +27,11 @@ def generate_answer(query_text: str, context_chunks: list[dict]) -> str:
         text = chunk.get('text', '')
         context_text += f"\n--- Source {i}: {source} ---\n{text}\n"
 
-    # Define strict system instructions to prevent hallucination
+    # Define instructions that prioritize your documents but allow Google Search as a backup
     system_instruction = (
         "You are a highly helpful and precise AI Research Assistant. "
-        "Your task is to answer the user's question based ONLY on the provided Context excerpts. "
-        "If the Context excerpts do not contain the answer, you must politely refuse to answer. "
-        "Do not use your own internal knowledge to answer the question.\n\n"
+        "Your primary task is to answer the user's question based on the provided Context excerpts. "
+        "If the Context excerpts do NOT contain the answer, you should use the Google Search tool to find reliable, up-to-date information from the web.\n\n"
         "FORMATTING INSTRUCTIONS:\n"
         "- ALWAYS use markdown formatting for readability.\n"
         "- Use bullet points `- ` or numbered lists `1. ` for steps, options, and lists.\n"
@@ -64,7 +63,8 @@ def generate_answer(query_text: str, context_chunks: list[dict]) -> str:
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                temperature=0.1, # Low temperature for more factual, less creative responses
+                temperature=0.1, 
+                tools=[types.Tool(google_search=types.GoogleSearchRetrieval())]
             ),
         )
         return response.text
