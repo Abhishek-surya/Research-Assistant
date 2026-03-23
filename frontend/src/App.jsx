@@ -36,7 +36,7 @@ function App() {
 
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch('http://127.0.0.1:8000/api/chat', {
+      const response = await fetch('https://ai-research-assistant-backend-newa.onrender.com/api/chat', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

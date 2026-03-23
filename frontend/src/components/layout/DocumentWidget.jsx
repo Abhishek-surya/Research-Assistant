@@ -12,7 +12,7 @@ const DocumentWidget = ({ refreshTrigger }) => {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) return;
-      const response = await fetch('http://127.0.0.1:8000/api/documents', {
+      const response = await fetch('https://ai-research-assistant-backend-newa.onrender.com/api/documents', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Failed to fetch');
@@ -47,7 +47,7 @@ const DocumentWidget = ({ refreshTrigger }) => {
     setDeletingFile(filename);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const response = await fetch(`http://127.0.0.1:8000/api/documents/${encodeURIComponent(filename)}`, {
+      const response = await fetch(`https://ai-research-assistant-backend-newa.onrender.com/api/documents/${encodeURIComponent(filename)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

@@ -29,7 +29,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
       const token = await auth.currentUser.getIdToken();
       const formData = new FormData();
       formData.append('document', file);
-      const response = await fetch('http://127.0.0.1:8000/api/upload', {
+      const response = await fetch('https://ai-research-assistant-backend-newa.onrender.com/api/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -55,7 +55,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
     
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch('http://127.0.0.1:8000/api/scrape', {
+      const response = await fetch('https://ai-research-assistant-backend-newa.onrender.com/api/scrape', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
