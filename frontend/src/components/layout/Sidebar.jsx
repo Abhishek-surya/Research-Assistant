@@ -1,43 +1,59 @@
 import React from 'react';
-import { MessageSquarePlus, MessageSquare, LogOut } from 'lucide-react';
+import { MessageSquarePlus, MessageSquare, LogOut, Loader2 } from 'lucide-react';
 import { auth } from '../../config/firebase';
 import { signOut } from 'firebase/auth';
 import DocumentWidget from './DocumentWidget';
 
-const Sidebar = ({ user, refreshTrigger }) => {
+const Sidebar = ({ user, refreshTrigger, chatSessions, sessionsLoading, activeSessionId, onSelectSession, onNewChat }) => {
   const handleLogout = () => {
     signOut(auth);
   };
 
   return (
     <div className="sidebar glass-panel">
-      <button className="new-chat-btn primary">
+      <button className="new-chat-btn primary" onClick={onNewChat}>
         <MessageSquarePlus size={20} />
         <span>New Chat</span>
       </button>
 
       <div className="history-list">
-        <div className="history-item active">
-          <MessageSquare size={18} />
-          <span>Firebase Setup</span>
-        </div>
-        <div className="history-item">
-          <MessageSquare size={18} />
-          <span>React Concepts</span>
-        </div>
-        <div className="history-item">
-          <MessageSquare size={18} />
-          <span>System Architecture</span>
-        </div>
+        {sessionsLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}>
+            <Loader2 size={18} className="spin" />
+          </div>
+        ) : chatSessions.length === 0 ? (
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '8px 12px' }}>
+            No past chats yet.
+          </p>
+        ) : (
+          chatSessions.map((session) => (
+            <div
+              key={session.session_id}
+              className={`history-item ${session.session_id === activeSessionId ? 'active' : ''}`}
+              onClick={() => onSelectSession(session.session_id)}
+              title={session.title}
+            >
+              <MessageSquare size={16} style={{ flexShrink: 0 }} />
+              <span style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1
+              }}>
+                {session.title}
+              </span>
+            </div>
+          ))
+        )}
       </div>
 
       <DocumentWidget refreshTrigger={refreshTrigger} />
 
       <div className="user-profile-block">
         <div className="user-info">
-          <img 
-            src={user?.photoURL || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
-            alt="Profile" 
+          <img
+            src={user?.photoURL || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'}
+            alt="Profile"
             className="profile-pic"
           />
           <div className="user-details">

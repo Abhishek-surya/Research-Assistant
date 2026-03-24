@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../../config/firebase';
+import { API_BASE_URL } from '../../config/api';
 import { FileText, Globe, Loader2, Trash2 } from 'lucide-react';
 
 const DocumentWidget = ({ refreshTrigger }) => {
@@ -12,7 +13,7 @@ const DocumentWidget = ({ refreshTrigger }) => {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) return;
-      const response = await fetch('https://ai-research-assistant-backend-newa.onrender.com/api/documents', {
+      const response = await fetch(`${API_BASE_URL}/documents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Failed to fetch');
@@ -47,7 +48,7 @@ const DocumentWidget = ({ refreshTrigger }) => {
     setDeletingFile(filename);
     try {
       const token = await auth.currentUser?.getIdToken();
-      const response = await fetch(`https://ai-research-assistant-backend-newa.onrender.com/api/documents/${encodeURIComponent(filename)}`, {
+      const response = await fetch(`${API_BASE_URL}/documents/${encodeURIComponent(filename)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

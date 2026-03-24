@@ -35,7 +35,7 @@ dist/
 backend/.env
 
 # Service account key (DO NOT COMMIT)
-backend/serviceAccountKey.json
+# backend/serviceAccountKey.json
 
 # Python caches / venv
 **/__pycache__/

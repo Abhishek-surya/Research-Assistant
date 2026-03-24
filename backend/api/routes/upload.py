@@ -3,7 +3,9 @@ from api.deps import verify_token
 from services.chunker import chunk_and_save
 from services.html_cleaner import clean_html
 import pdfplumber
-import io
+import shutil
+import tempfile
+import os
 
 router = APIRouter()
 
@@ -16,18 +18,22 @@ async def upload_document(
     if not user_email:
         raise HTTPException(status_code=400, detail="User email not found in token")
 
-    contents = await document.read()
     extracted_text = ""
     mime = document.content_type or ""
     filename = document.filename or "document"
     doc_type = "text"
 
     # ── PDF ──────────────────────────────────────────────────────────────
-    if "pdf" in mime or filename.lower().endswith(".pdf") or contents.startswith(b"%PDF"):
+    if "pdf" in mime or filename.lower().endswith(".pdf"):
         doc_type = "pdf"
+        fd, temp_path = tempfile.mkstemp(suffix=".pdf")
         try:
-            with pdfplumber.open(io.BytesIO(contents)) as pdf:
-                pages_text = []
+            os.close(fd)
+            with open(temp_path, "wb") as buffer:
+                shutil.copyfileobj(document.file, buffer)
+                
+            with pdfplumber.open(temp_path) as pdf:
+                pages_text: list[str] = []
                 for i, page in enumerate(pdf.pages):
                     text = page.extract_text()
                     if text:
@@ -35,30 +41,33 @@ async def upload_document(
                 extracted_text = "\n\n".join(pages_text)
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"Failed to extract PDF text: {str(e)}")
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
-    # ── HTML ─────────────────────────────────────────────────────────────
-    elif "html" in mime or filename.lower().endswith((".html", ".htm")):
-        doc_type = "html"
-        raw_html = contents.decode("utf-8", errors="replace")
-        extracted_text = clean_html(raw_html)
-
-    # ── Plain Text ───────────────────────────────────────────────────────
-    elif "text" in mime or filename.lower().endswith(".txt"):
-        doc_type = "text"
-        extracted_text = contents.decode("utf-8", errors="replace")
-
-    # ── Fallback ─────────────────────────────────────────────────────────
+    # ── HTML & Text ─────────────────────────────────────────────────────
     else:
-        try:
-            raw = contents.decode("utf-8", errors="replace")
-            # If it looks like HTML, clean it; otherwise treat as plain text
-            if raw.lstrip().startswith("<"):
-                doc_type = "html"
-                extracted_text = clean_html(raw)
-            else:
-                extracted_text = raw
-        except Exception:
-            raise HTTPException(status_code=415, detail="Unsupported file type.")
+        contents = await document.read()
+        
+        if "html" in mime or filename.lower().endswith((".html", ".htm")):
+            doc_type = "html"
+            raw_html = contents.decode("utf-8", errors="replace")
+            extracted_text = clean_html(raw_html)
+
+        elif "text" in mime or filename.lower().endswith(".txt"):
+            doc_type = "text"
+            extracted_text = contents.decode("utf-8", errors="replace")
+
+        else:
+            try:
+                raw = contents.decode("utf-8", errors="replace")
+                if raw.lstrip().startswith("<"):
+                    doc_type = "html"
+                    extracted_text = clean_html(raw)
+                else:
+                    extracted_text = raw
+            except Exception:
+                raise HTTPException(status_code=415, detail="Unsupported file type.")
 
     if not extracted_text.strip():
         raise HTTPException(status_code=422, detail="No text could be extracted from the document.")

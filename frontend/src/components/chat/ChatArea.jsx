@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Paperclip, Loader2, FileText, Link as LinkIcon, X, Globe, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { auth } from '../../config/firebase';
+import { API_BASE_URL } from '../../config/api';
 
 const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
   const [input, setInput] = useState('');
@@ -29,7 +30,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
       const token = await auth.currentUser.getIdToken();
       const formData = new FormData();
       formData.append('document', file);
-      const response = await fetch('https://ai-research-assistant-backend-newa.onrender.com/api/upload', {
+      const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -55,7 +56,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
     
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch('https://ai-research-assistant-backend-newa.onrender.com/api/scrape', {
+      const response = await fetch(`${API_BASE_URL}/scrape`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -82,15 +83,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim() || attachment) {
-      let finalMsg = input.trim();
-      if (attachment) {
-        if (attachment.text) {
-          const snippet = attachment.text.length > 500 ? attachment.text.substring(0, 500) + '...' : attachment.text;
-          const label = attachment.type === 'link' ? `Web Page: ${attachment.name}` : `Document: ${attachment.name}`;
-          finalMsg = finalMsg ? `${finalMsg}\n\n[${label}]\n${snippet}` : `[${label}]\n${snippet}`;
-        }
-      }
-      onSendMessage(finalMsg);
+      onSendMessage(input.trim(), attachment);
       setInput('');
       setAttachment(null);
     }
@@ -124,6 +117,26 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
                 {msg.sender === 'ai' && !msg.isLoading ? (
                   <div className="markdown-prose">
                     <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  </div>
+                ) : msg.sender === 'user' ? (
+                  <div className="user-message-content" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {msg.attachment && (
+                      <div className="message-attachment-badge" style={{ 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)', 
+                        padding: '6px 10px', 
+                        borderRadius: '6px', 
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        width: 'fit-content'
+                      }}>
+                        {msg.attachment.type === 'link' ? <Globe size={14} /> : <FileText size={14} />}
+                        <span>{msg.attachment.name}</span>
+                      </div>
+                    )}
+                    {msg.text && <div>{msg.text}</div>}
                   </div>
                 ) : (
                   msg.text

@@ -1,15 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 from api.deps import verify_token
 from firebase_admin import firestore
 from services.embedder import generate_embedding
 from services.llm import generate_answer
 import math
+import uuid
+from datetime import datetime, timezone
 
 router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
 
 def cosine_similarity(v1: list[float], v2: list[float]) -> float:
     """Compute cosine similarity between two vectors."""
@@ -64,14 +68,31 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
             "doc_type": data.get("doc_type", "pdf")
         })
 
-    # 4. Sort by score descending and take Top 20
-    scored_chunks.sort(key=lambda x: x["score"], reverse=True)
-    top_chunks = scored_chunks[:20]
+    # 4. Filter low-confidence chunks, sort descending, take Top 5
+    SIMILARITY_THRESHOLD = 0.35
+    relevant_chunks = [c for c in scored_chunks if c["score"] >= SIMILARITY_THRESHOLD]
+    relevant_chunks.sort(key=lambda x: x["score"], reverse=True)
+    top_chunks = relevant_chunks[:5]
 
     # 5. Generate Answer using Gemini LLM
     llm_reply = generate_answer(query_text, top_chunks)
 
+    # 6. Persist Q&A turn to Firestore chat_history
+    session_id = payload.session_id or str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+
+    db.collection("chat_history").add({
+        "session_id": session_id,
+        "user_email": user_email,
+        "query": query_text,
+        "reply": llm_reply,
+        "timestamp": now,
+        # Store a short title from the first 60 chars of the query
+        "title": query_text[:60].strip(),
+    })
+
     return {
         "reply": llm_reply,
+        "session_id": session_id,
         "context_chunks": top_chunks
     }

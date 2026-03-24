@@ -8,7 +8,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)),
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
-from api.routes import upload, documents, scrape, chat
+from api.routes import upload, documents, scrape, chat, history
 from core.firebase import init_firebase
 from services.embedding_scheduler import process_pending_chunks
 
@@ -52,6 +52,7 @@ app.include_router(upload.router, prefix="/api")
 app.include_router(documents.router, prefix="/api")
 app.include_router(scrape.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(history.router, prefix="/api")
 
 @app.get("/")
 def read_root():
