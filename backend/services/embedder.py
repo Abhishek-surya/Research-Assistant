@@ -42,3 +42,22 @@ def generate_embedding(text: str) -> list[float]:
         )
     )
     return list(response.embeddings[0].values)
+
+
+def generate_embeddings_batch(texts: list[str]) -> list[list[float]]:
+    """
+    Generate vector embeddings for a batch of strings using Google's gemini-embedding-001 model.
+    """
+    if not texts:
+        return []
+        
+    client = _get_client()
+    response = client.models.embed_content(
+        model="gemini-embedding-001",
+        contents=texts,
+        config=types.EmbedContentConfig(
+            task_type="RETRIEVAL_DOCUMENT",
+            output_dimensionality=1536
+        )
+    )
+    return [list(e.values) for e in response.embeddings]

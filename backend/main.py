@@ -2,8 +2,14 @@ import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-# Load .env FIRST — before any service module reads os.environ
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'))
+# Load .env FIRST
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'), override=True)
+
+# FORCE INJECT NEW KEY (Bypassing OS Cache)
+os.environ["GEMINI_API_KEY"] = "AIzaSyCpGn0b5_qleR1IrKQ5ZpehR898C2i07gM"
+
+# Debug line
+print("🔥 CURRENT API KEY STARTS WITH:", str(os.environ.get("GEMINI_API_KEY"))[:15])
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
