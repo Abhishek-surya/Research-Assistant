@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # Resolve .env path absolutely regardless of working directory
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
-load_dotenv(dotenv_path=_env_path)
+load_dotenv(dotenv_path=_env_path, override=True)
 
 from google import genai
 from google.genai import types

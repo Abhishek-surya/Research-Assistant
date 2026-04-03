@@ -1,10 +1,10 @@
 import React from 'react';
-import { MessageSquarePlus, MessageSquare, LogOut, Loader2 } from 'lucide-react';
+import { MessageSquarePlus, MessageSquare, LogOut, Loader2, Trash2 } from 'lucide-react';
 import { auth } from '../../config/firebase';
 import { signOut } from 'firebase/auth';
 import DocumentWidget from './DocumentWidget';
 
-const Sidebar = ({ user, refreshTrigger, chatSessions, sessionsLoading, activeSessionId, onSelectSession, onNewChat }) => {
+const Sidebar = ({ user, refreshTrigger, chatSessions, sessionsLoading, activeSessionId, onSelectSession, onNewChat, onDeleteSession }) => {
   const handleLogout = () => {
     signOut(auth);
   };
@@ -42,6 +42,28 @@ const Sidebar = ({ user, refreshTrigger, chatSessions, sessionsLoading, activeSe
               }}>
                 {session.title}
               </span>
+              <button 
+                className="delete-session-btn"
+                title="Delete Session"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteSession(session.session_id);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted, #888)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px',
+                  borderRadius: '4px'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = 'var(--text-color, #fff)'}
+                onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-muted, #888)'}
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ))
         )}

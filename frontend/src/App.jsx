@@ -71,7 +71,12 @@ function App() {
       // Reconstruct messages array from Q&A turns
       const loaded = [];
       data.messages.forEach((turn, idx) => {
-        loaded.push({ id: `${sessionId}-q-${idx}`, sender: 'user', text: turn.query });
+        loaded.push({ 
+          id: `${sessionId}-q-${idx}`, 
+          sender: 'user', 
+          text: turn.query,
+          attachment: turn.attachment // Restore the attachment badge
+        });
         loaded.push({ id: `${sessionId}-a-${idx}`, sender: 'ai', text: turn.reply });
       });
 
@@ -88,13 +93,34 @@ function App() {
     setActiveSessionId(null);
   };
 
-  const handleSendMessage = async (text, attachment = null) => {
-    let apiMessage = text;
-    if (attachment && attachment.text) {
-      const snippet = attachment.text.length > 500 ? attachment.text.substring(0, 500) + '...' : attachment.text;
-      const label = attachment.type === 'link' ? `Web Page: ${attachment.name}` : `Document: ${attachment.name}`;
-      apiMessage = text ? `${text}\n\n[${label}]\n${snippet}` : `[${label}]\n${snippet}`;
+  // Delete a chat session
+  const handleDeleteSession = async (sessionId) => {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch(`${API_BASE_URL}/chats/${sessionId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete session');
+      }
+      
+      // Update UI state
+      setChatSessions(prev => prev.filter(s => s.session_id !== sessionId));
+      
+      // Clear chat window if the active session is deleted
+      if (activeSessionId === sessionId) {
+        setMessages([WELCOME_MSG]);
+        setActiveSessionId(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete session:', err);
     }
+  };
+
+  const handleSendMessage = async (text, attachment = null) => {
+    // No longer joining text and attachment.text here. 
+    // The backend will handle the context separately.
 
     const userMsg = {
       id: Date.now().toString(),
@@ -116,7 +142,12 @@ function App() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ message: apiMessage, session_id: activeSessionId })
+        body: JSON.stringify({ 
+          message: text || '', 
+          session_id: activeSessionId,
+          active_context: attachment ? attachment.text : null,
+          attachment_meta: attachment ? { name: attachment.name, type: attachment.type } : null
+        })
       });
 
       const data = await response.json();
@@ -170,6 +201,7 @@ function App() {
         activeSessionId={activeSessionId}
         onSelectSession={handleSelectSession}
         onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
       />
       <ChatArea
         messages={messages}

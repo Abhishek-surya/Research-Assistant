@@ -69,7 +69,36 @@ async def get_session_messages(session_id: str, user_token: dict = Depends(verif
         messages.append({
             "query": data.get("query", ""),
             "reply": data.get("reply", ""),
+            "attachment": data.get("attachment"),
             "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
         })
 
     return {"messages": messages}
+
+@router.delete("/chats/{session_id}")
+async def delete_chat_session(session_id: str, user_token: dict = Depends(verify_token)):
+    """
+    Delete all Q&A turns for a given session_id.
+    """
+    user_email = user_token.get("email")
+    if not user_email:
+        raise HTTPException(status_code=400, detail="User email not found in token")
+
+    db = firestore.client()
+    docs = (
+        db.collection("chat_history")
+        .where("user_email", "==", user_email)
+        .where("session_id", "==", session_id)
+        .stream()
+    )
+
+    batch = db.batch()
+    count = 0
+    for doc in docs:
+        batch.delete(doc.reference)
+        count += 1
+    
+    if count > 0:
+        batch.commit()
+
+    return {"message": f"Deleted {count} messages for session {session_id}"}

@@ -2,8 +2,10 @@ import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-# Load .env FIRST
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env'), override=True)
+# Load .env with absolute path and override=True
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+os.environ.pop("GEMINI_API_KEY", None) # Clear any cached key
+load_dotenv(dotenv_path=env_path, override=True)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
