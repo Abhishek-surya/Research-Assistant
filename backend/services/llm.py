@@ -6,7 +6,7 @@ from firebase_admin import firestore
 
 # Load .env so GEMINI_API_KEY is always available regardless of launch context
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
-load_dotenv(dotenv_path=_env_path, override=True)
+load_dotenv(dotenv_path=_env_path)
 
 _client = None
 

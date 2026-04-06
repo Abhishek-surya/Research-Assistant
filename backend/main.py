@@ -2,10 +2,9 @@ import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-# Load .env with absolute path and override=True
+# Load .env with absolute path, but without overriding existing OS env vars (like Render production vars)
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-os.environ.pop("GEMINI_API_KEY", None) # Clear any cached key
-load_dotenv(dotenv_path=env_path, override=True)
+load_dotenv(dotenv_path=env_path)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
