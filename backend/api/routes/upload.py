@@ -1,6 +1,7 @@
-from fastapi import APIRouter, File, UploadFile, Depends, HTTPException
+from fastapi import APIRouter, File, UploadFile, Depends, HTTPException, BackgroundTasks
 from api.deps import verify_token
 from services.chunker import chunk_and_save
+from services.embedding_scheduler import process_pending_chunks
 from services.html_cleaner import clean_html
 import pdfplumber
 import shutil
@@ -11,6 +12,7 @@ router = APIRouter()
 
 @router.post("/upload")
 async def upload_document(
+    background_tasks: BackgroundTasks,
     document: UploadFile = File(...),
     user_token: dict = Depends(verify_token)
 ):
@@ -81,6 +83,8 @@ async def upload_document(
         source_url=f"local://{user_email}/{filename}",
         doc_type=doc_type
     )
+
+    background_tasks.add_task(process_pending_chunks)
 
     return {
         "message": "Document processed and chunked successfully",

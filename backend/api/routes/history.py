@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from api.deps import verify_token
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 router = APIRouter()
 
@@ -21,8 +22,9 @@ async def get_chat_sessions(user_token: dict = Depends(verify_token)):
     db = firestore.client()
     docs = (
         db.collection("chat_history")
-        .where("user_email", "==", user_email)
+        .where(filter=FieldFilter("user_email", "==", user_email))
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
+        .limit(150)
         .stream()
     )
 
@@ -56,8 +58,8 @@ async def get_session_messages(session_id: str, user_token: dict = Depends(verif
     db = firestore.client()
     docs = (
         db.collection("chat_history")
-        .where("user_email", "==", user_email)
-        .where("session_id", "==", session_id)
+        .where(filter=FieldFilter("user_email", "==", user_email))
+        .where(filter=FieldFilter("session_id", "==", session_id))
         .order_by("timestamp", direction=firestore.Query.ASCENDING)
         .stream()
     )
@@ -87,8 +89,8 @@ async def delete_chat_session(session_id: str, user_token: dict = Depends(verify
     db = firestore.client()
     docs = (
         db.collection("chat_history")
-        .where("user_email", "==", user_email)
-        .where("session_id", "==", session_id)
+        .where(filter=FieldFilter("user_email", "==", user_email))
+        .where(filter=FieldFilter("session_id", "==", session_id))
         .stream()
     )
 

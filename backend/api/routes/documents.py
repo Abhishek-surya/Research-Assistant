@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from api.deps import verify_token
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 import os
 
 router = APIRouter()
@@ -26,7 +27,7 @@ async def list_documents(user_token: dict = Depends(verify_token)):
     
     # Query chunks that haven't been embedded yet
     for status in ["new", "embedding_failed"]:
-        docs = chunks_ref.where("user_email", "==", user_email).where("status", "==", status).stream()
+        docs = chunks_ref.where(filter=FieldFilter("user_email", "==", user_email)).where(filter=FieldFilter("status", "==", status)).stream()
         for doc in docs:
             data = doc.to_dict()
             fn = data.get("filename") or data.get("document_name")
@@ -95,7 +96,7 @@ async def delete_document(filename: str, user_token: dict = Depends(verify_token
     # Use single-field query (no composite index needed) then filter in Python
     # This avoids composite index build-time race conditions entirely
     print(f"[DELETE] Searching chunks: user={user_email}, filename={filename}")
-    all_user_chunks = chunks_ref.where("user_email", "==", user_email).stream()
+    all_user_chunks = chunks_ref.where(filter=FieldFilter("user_email", "==", user_email)).stream()
     for doc in all_user_chunks:
         data = doc.to_dict()
         stored_filename = data.get("filename", "")

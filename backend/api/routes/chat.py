@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from api.deps import verify_token
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from services.embedder import generate_embedding
 from services.llm import generate_answer
 import math
@@ -17,16 +18,7 @@ class ChatRequest(BaseModel):
     active_context: Optional[str] = None # The raw text context
     attachment_meta: Optional[dict] = None # Metadata (name, type)
 
-def cosine_similarity(v1: list[float], v2: list[float]) -> float:
-    """Compute cosine similarity between two vectors."""
-    if len(v1) != len(v2):
-        return 0.0
-    dot_product = sum(a * b for a, b in zip(v1, v2))
-    mag1 = math.sqrt(sum(a * a for a in v1))
-    mag2 = math.sqrt(sum(b * b for b in v2))
-    if mag1 == 0 or mag2 == 0:
-        return 0.0
-    return dot_product / (mag1 * mag2)
+
 
 @router.post("/chat")
 async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify_token)):
@@ -50,37 +42,44 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to embed query: {str(e)}")
 
-    # 2. Fetch all processed chunks for the user
+    from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
+
+    # 2. Fetch nearest chunks using native Firestore Vector Search
     db = firestore.client()
     chunks_ref = db.collection("document_chunks")
-    docs = chunks_ref.where("user_email", "==", user_email).where("status", "==", "processed").stream()
+    
+    # Apply vector search on filtered collection. 
+    # Similarity Threshold 0.35 means max COSINE distance is 0.65
+    vector_query = chunks_ref.where(
+        filter=FieldFilter("user_email", "==", user_email)
+    ).where(
+        filter=FieldFilter("status", "==", "processed")
+    ).find_nearest(
+        vector_field="embedding",
+        query_vector=query_embedding,
+        distance_measure=DistanceMeasure.COSINE,
+        limit=5,
+        distance_threshold=0.65,
+        distance_result_field="vector_distance"
+    )
+    docs = vector_query.stream()
 
-    scored_chunks = []
+    top_chunks = []
     for doc in docs:
         data = doc.to_dict()
-        doc_embedding = data.get("embedding")
-        if not doc_embedding:
-            continue
+        distance = data.get("vector_distance", 1.0)
+        similarity_score = 1.0 - distance
         
-        # 3. Compute similarity
-        score = cosine_similarity(query_embedding, doc_embedding)
-        
-        scored_chunks.append({
+        top_chunks.append({
             "id": doc.id,
             "text": data.get("text", ""),
             "document_name": data.get("document_name", "Unknown"),
             "filename": data.get("filename", ""),
             "page_number": data.get("page_number", 1),
             "source_url": data.get("source_url", ""),
-            "score": score,
+            "score": similarity_score,
             "doc_type": data.get("doc_type", "pdf")
         })
-
-    # 4. Filter low-confidence chunks, sort descending, take Top 5
-    SIMILARITY_THRESHOLD = 0.35
-    relevant_chunks = [c for c in scored_chunks if c["score"] >= SIMILARITY_THRESHOLD]
-    relevant_chunks.sort(key=lambda x: x["score"], reverse=True)
-    top_chunks = relevant_chunks[:5]
 
     # 5. Generate Answer using Gemini LLM
     llm_reply = generate_answer(query_for_search, top_chunks)

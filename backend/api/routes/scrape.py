@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from api.deps import verify_token
 from services.chunker import chunk_and_save
+from services.embedding_scheduler import process_pending_chunks
 from services.html_cleaner import clean_html
 from bs4 import BeautifulSoup
 import requests
@@ -27,7 +28,11 @@ def sanitize_filename(url: str) -> str:
     return name + ".html"
 
 @router.post("/scrape")
-async def scrape_url(payload: ScrapeRequest, user_token: dict = Depends(verify_token)):
+async def scrape_url(
+    payload: ScrapeRequest, 
+    background_tasks: BackgroundTasks,
+    user_token: dict = Depends(verify_token)
+):
     url = payload.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
@@ -102,6 +107,8 @@ async def scrape_url(payload: ScrapeRequest, user_token: dict = Depends(verify_t
         source_url=url,
         doc_type=doc_type
     )
+
+    background_tasks.add_task(process_pending_chunks)
 
     return {
         "message": "Page scraped successfully",

@@ -1,16 +1,22 @@
 import os
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from firebase_admin import firestore
 
-# Initialize client using the API key from environment
-# The google-genai SDK automatically picks up GEMINI_API_KEY from os.environ
+# Load .env so GEMINI_API_KEY is always available regardless of launch context
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
+load_dotenv(dotenv_path=_env_path, override=True)
+
 _client = None
 
 def get_client():
     global _client
     if not _client:
-        _client = genai.Client()
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key or api_key == "your_gemini_api_key_here":
+            raise ValueError("GEMINI_API_KEY is not set. Please add it to backend/.env")
+        _client = genai.Client(api_key=api_key)
     return _client
 
 def generate_answer(query_text: str, context_chunks: list[dict]) -> str:
