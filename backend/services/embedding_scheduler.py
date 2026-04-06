@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+from google.cloud.firestore_v1.vector import Vector
 from services.embedder import generate_embedding, generate_embeddings_batch
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ def process_pending_chunks():
             for doc, embedding in zip(valid_docs, embeddings):
                 try:
                     doc.reference.update({
-                        "embedding": embedding,
+                        "embedding": Vector(embedding),
                         "status": "processed",
                         "embedded_at": datetime.now(timezone.utc),
                         "error": firestore.DELETE_FIELD,   # clear any previous error
