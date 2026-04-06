@@ -6,6 +6,7 @@ vector embeddings using Gemini, and updates their status to 'processed'.
 import logging
 from datetime import datetime, timezone
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from services.embedder import generate_embedding, generate_embeddings_batch
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def process_pending_chunks():
     for status in ("new", "embedding_failed"):
         docs = (
             collection
-            .where("status", "==", status)
+            .where(filter=FieldFilter("status", "==", status))
             .limit(BATCH_SIZE)
             .stream()
         )
