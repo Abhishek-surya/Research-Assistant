@@ -40,8 +40,7 @@ def process_pending_chunks():
             break
 
     if not pending:
-        logger.debug("[Scheduler] No pending chunks — nothing to embed.")
-        return
+        return {"processed": 0, "success": 0, "failed": 0, "message": "No pending chunks"}
 
     logger.info(f"[Scheduler] Found {len(pending)} pending chunk(s). Embedding now...")
 
@@ -91,7 +90,8 @@ def process_pending_chunks():
                     pass
                 failed += 1
 
-    logger.info(
-        f"[Scheduler] Batch complete — "
-        f"{success} embedded ✅ | {failed} failed ⚠️"
-    )
+    return {
+        "processed": len(pending),
+        "success": success,
+        "failed": failed
+    }
