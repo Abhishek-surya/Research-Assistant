@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -31,12 +32,12 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Failed to initialize Firebase: {e}")
     
     yield
-    # Shutdown logic (if any) goes here
+    # Shutdown logic
     logger.info("🛑 Application shutting down.")
 
 app = FastAPI(
     title="AI Research Assistant API",
-    description="Production-ready FastAPI backend for AI Research Assistant",
+    description="Production-ready FastAPI backend",
     lifespan=lifespan
 )
 
@@ -75,8 +76,16 @@ async def health_check():
     """
     Standard health check endpoint for Render/Cloudflare.
     """
+    logger.info("💓 Health check received at /")
     return {
         "status": "healthy",
         "service": "AI Research Assistant API",
-        "timestamp": os.popen("date").read().strip()
+        "utc_time": datetime.utcnow().isoformat()
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    # Use $PORT from environment (default to 10000 for local/Render default)
+    port = int(os.environ.get("PORT", 10000))
+    logger.info(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
