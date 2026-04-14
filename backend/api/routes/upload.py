@@ -10,6 +10,8 @@ import os
 
 router = APIRouter()
 
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
+
 @router.post("/upload")
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -73,6 +75,14 @@ async def upload_document(
 
     if not extracted_text.strip():
         raise HTTPException(status_code=422, detail="No text could be extracted from the document.")
+
+    # ── Persist lightweight text locally ─────────────────────────────────
+    user_dir = os.path.join(DATA_DIR, user_email)
+    os.makedirs(user_dir, exist_ok=True)
+    filepath = os.path.join(user_dir, filename)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"<!-- Title: {filename} -->\n\n")
+        f.write(extracted_text)
 
     # ── Chunk & persist to Firestore ─────────────────────────────────────
     chunk_count = chunk_and_save(

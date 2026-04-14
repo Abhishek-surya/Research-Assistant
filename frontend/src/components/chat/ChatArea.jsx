@@ -15,6 +15,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
 
   const endOfMessagesRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -38,6 +39,9 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Upload failed');
       setAttachment({ name: file.name, text: data.text, type: 'file' });
+      
+      // Signal sidebar to refresh the documents list
+      if (onDocumentAdded) onDocumentAdded();
     } catch (error) {
       alert('Upload failed: ' + error.message);
     } finally {
@@ -86,6 +90,9 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
       onSendMessage(input.trim(), attachment);
       setInput('');
       setAttachment(null);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     }
   };
 
@@ -110,7 +117,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
                 {msg.sender === 'user' ? (
                   <img src={user?.photoURL || ''} alt="User" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
                 ) : (
-                  <Sparkles size={20} color="#3b82f6" />
+                  <Sparkles size={20} color="#ececec" />
                 )}
               </div>
               <div className="message-content">
@@ -239,9 +246,14 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
             </div>
 
             <textarea
+              ref={textareaRef}
               className="chat-input"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
               onKeyDown={handleKeyDown}
               placeholder={isUploading ? uploadStatus : "Message AI Research Assistant..."}
               rows={1}

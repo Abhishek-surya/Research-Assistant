@@ -22,7 +22,7 @@
   gap: 0.75rem;
   padding: 0.8rem 1.2rem;
   background: transparent;
-  border: 1px solid var(--panel-border);
+  border: none;
   border-radius: 12px;
   color: var(--text-main);
   font-weight: 500;
@@ -37,14 +37,14 @@
 }
 
 .new-chat-btn.primary {
-  background: var(--accent-primary);
+  background: #ececec;
   border: none;
   box-shadow: none;
-  color: #fff;
+  color: #171717;
 }
 
 .new-chat-btn.primary:hover {
-  background: #2563eb;
+  background: #666;
   box-shadow: none;
   animation: none;
 }
@@ -75,9 +75,9 @@
 }
 
 .history-item.active {
-  background: var(--panel-bg);
+  background: #2f2f2f;
   color: var(--text-main);
-  border: 1px solid var(--panel-border);
+  border: none;
 }
 
 /* Chat Area Styles */
@@ -154,9 +154,9 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.28);
-  color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
   padding: 0.35rem 0.75rem;
   border-radius: 12px;
   font-size: 0.75rem;
@@ -167,8 +167,8 @@
 }
 
 .info-btn:hover {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
 
@@ -308,8 +308,8 @@
 /* Input Area */
 .input-container {
   padding: 1rem 1rem 1.25rem;
-  background: rgba(31, 33, 39, 0.66);
-  border-top: 1px solid var(--panel-border);
+  background: var(--bg-color);
+  border-top: none;
 }
 
 .input-box {
@@ -317,13 +317,15 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.7rem 0.85rem;
-  border-radius: 999px;
+  border-radius: 20px;
+  background: #2f2f2f;
+  border: 1px solid transparent;
   transition: all 0.3s ease;
 }
 
 .input-box:focus-within {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: none;
 }
 
 .chat-input {
@@ -335,8 +337,9 @@
   font-size: 1rem;
   font-family: inherit;
   resize: none;
-  height: 24px;
+  min-height: 24px;
   max-height: 120px;
+  overflow-y: auto;
 }
 
 .chat-input::placeholder {
@@ -344,28 +347,27 @@
 }
 
 .send-btn {
-  background: var(--accent-primary);
+  background: var(--text-main);
   border: none;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--bg-color);
   cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .send-btn:hover {
-  background: #2563eb;
-  transform: scale(1.05);
+  background: #ffffff;
 }
 
 .send-btn:disabled {
-  background: var(--panel-border);
+  background: #3a3a3a;
+  color: #555555;
   cursor: not-allowed;
-  transform: none;
 }
 
 /* Auth / Login Styles */
@@ -420,7 +422,7 @@
   gap: 1rem;
   width: 100%;
   padding: 1rem 1.5rem;
-  background: rgba(59, 130, 246, 0.12);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-main);
   border: 1px solid var(--panel-border);
   border-radius: 12px;
@@ -433,8 +435,8 @@
 
 .google-btn:hover {
   transform: translateY(-2px);
-  background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .google-icon {
@@ -569,13 +571,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--panel-bg);
-  border: 1px solid var(--accent-primary);
+  background: #2f2f2f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0.5rem 1rem;
   border-radius: 12px;
   margin-bottom: 1rem;
   font-size: 0.85rem;
-  color: var(--accent-primary);
+  color: var(--text-main);
   animation: slideUpFade 0.3s ease-out;
 }
 
@@ -605,8 +607,8 @@
   padding: 0.75rem 1rem;
   border-radius: 12px;
   margin-bottom: 1rem;
-  background: var(--panel-bg);
-  border: 1px solid var(--accent-primary);
+  background: #2f2f2f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   animation: slideUpFade 0.3s ease-out;
   width: max-content;
@@ -622,14 +624,14 @@
 }
 
 .primary-sm {
-  background: var(--accent-gradient);
+  background: #ececec;
   border: none;
-  color: white;
+  color: #171717;
   padding: 0.4rem 0.8rem;
   border-radius: 6px;
   font-size: 0.8rem;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .close-sm {

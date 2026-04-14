@@ -1,20 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* ChatGPT-like dark palette */
-  --bg-color: #0b0d12;
-  --bg-gradient: linear-gradient(180deg, #0b0d12 0%, #101423 100%);
-  --panel-bg: rgba(31, 33, 39, 0.72);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --text-main: #e5e7eb;
-  --text-muted: #9ca3af;
-  --accent-primary: #3b82f6;
-  --accent-gradient: linear-gradient(135deg, #3b82f6, #6366f1);
-  --accent-glow: rgba(59, 130, 246, 0.42);
+  /* ChatGPT/Gemini monochromatic style palette */
+  --bg-color: #212121;
+  --bg-gradient: none;
+  --panel-bg: #171717;
+  --panel-border: rgba(255, 255, 255, 0.05); /* Slight separation edge */
+  --text-main: #ececec;
+  --text-muted: #999999;
+  --accent-primary: #ececec;
+  --accent-gradient: none;
+  --accent-glow: transparent;
 
   /* Message bubbles (dark mode) */
-  --user-msg-bg: rgba(59, 130, 246, 0.18);
-  --ai-msg-bg: rgba(255, 255, 255, 0.06);
+  --user-msg-bg: #2f2f2f;
+  --ai-msg-bg: transparent;
 }
 
 * {
@@ -39,12 +39,9 @@ body {
   width: 100%;
 }
 
-/* Glassmorphism Utilities */
+/* Solid Container Utilities */
 .glass-panel {
   background: var(--panel-bg);
-  /* ChatGPT feels mostly flat; keep blur minimal */
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--panel-border);
   box-shadow: none;
 }
