@@ -22,6 +22,9 @@ def init_firebase():
             else:
                 raise FileNotFoundError(f"Service account key not found at {cert_path} and FIREBASE_SERVICE_ACCOUNT_JSON is not set.")
 
+        # Use environment variable for storage bucket or fallback to the new project default
+        storage_bucket = os.environ.get('FIREBASE_STORAGE_BUCKET', 'ai-research-assistant-3d978.appspot.com')
+        
         firebase_admin.initialize_app(cred, {
-            'storageBucket': 'abhishek-rag-2026.appspot.com'
+            'storageBucket': storage_bucket
         })

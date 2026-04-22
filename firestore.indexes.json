@@ -5,7 +5,8 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "user_email", "order": "ASCENDING" },
-        { "fieldPath": "filename", "order": "ASCENDING" }
+        { "fieldPath": "filename", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
       ]
     },
     {
@@ -24,6 +25,35 @@
         { "fieldPath": "user_email", "order": "ASCENDING" },
         { "fieldPath": "doc_type", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "document_chunks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_email", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": { "dimension": 1536, "flat": {} }
+        }
+      ]
+    },
+    {
+      "collectionGroup": "chat_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_email", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chat_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_email", "order": "ASCENDING" },
+        { "fieldPath": "session_id", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
       ]
     }
   ],
