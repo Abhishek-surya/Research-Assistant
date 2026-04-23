@@ -59,8 +59,12 @@ const DocumentWidget = ({ refreshTrigger }) => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Delete failed');
-      // Refresh list after deletion
-      await fetchDocuments();
+      
+      // Update UI state instantly
+      setDocuments(prev => prev.filter(d => d.filename !== filename));
+      
+      // Background refresh for total sync
+      fetchDocuments(true);
     } catch (err) {
       alert('Delete failed: ' + err.message);
     } finally {

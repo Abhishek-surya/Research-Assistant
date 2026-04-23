@@ -3,6 +3,7 @@ from api.deps import verify_token
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 import os
+from urllib.parse import unquote
 
 router = APIRouter()
 
@@ -113,12 +114,16 @@ async def delete_document(filename: str, user_token: dict = Depends(verify_token
     # Invalidate the processing status cache for this user
     _processing_cache.pop(user_email, None)
 
-    # 1. Delete the local file
-    filepath = os.path.join(DATA_DIR, user_email, filename)
-    if not os.path.exists(filepath):
-        raise HTTPException(status_code=404, detail=f"Document '{filename}' not found")
+    # Sanitize: Handle URL-encoded filenames (e.g. spaces)
+    filename = unquote(filename)
 
-    os.remove(filepath)
+    # 1. Delete the local file if it exists
+    filepath = os.path.join(DATA_DIR, user_email, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+    else:
+        # On Render, local storage is ephemeral. Chunks usually outlive files.
+        print(f"[DELETE] Warning: Local file {filename} not found, proceeding with Firestore cleanup.")
 
     # 2. Cascade delete all matching document_chunks from Firestore
     db = firestore.client()
