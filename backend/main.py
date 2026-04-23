@@ -28,6 +28,7 @@ from services.embedding_scheduler import process_pending_chunks
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize critical services
+    print("🚀 [STARTUP] Initializing AI Research Assistant Backend...")
     try:
         init_firebase()
         logger.info("✅ Firebase initialized successfully.")
@@ -35,14 +36,14 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Failed to initialize Firebase: {e}")
     
     scheduler = BackgroundScheduler()
-    # Runs quietly in background as fallback to sweep up chunks that hit Google's 429 quota delay
+    # Runs quietly in background...
     scheduler.add_job(process_pending_chunks, "interval", minutes=2)
     scheduler.start()
-    logger.info("✅ APScheduler started as resilience fallback.")
+    logger.info("✅ APScheduler started for background embedding.")
     
     yield
     # Shutdown logic
-    logger.info("🛑 Application shutting down.")
+    logger.info("🛑 [SHUTDOWN] Application shutting down.")
     scheduler.shutdown()
 
 app = FastAPI(
@@ -67,9 +68,10 @@ app.add_middleware(
 
 # Set Cross-Origin-Opener-Policy for Auth/Popup compatibility
 @app.middleware("http")
-async def add_coop_header(request: Request, call_next):
+async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    response.headers["Cross-Origin-Embedder-Policy"] = "unsafe-none"
     return response
 
 # Routes
