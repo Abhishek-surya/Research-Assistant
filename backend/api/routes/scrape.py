@@ -98,6 +98,32 @@ async def scrape_url(
         f.write(f"<!-- Title: {title} -->\n\n")
         f.write(text)
 
+    # --- Wipe Old Chunks Before Re-ingestion ---
+    from firebase_admin import firestore
+    from google.cloud.firestore_v1.base_query import FieldFilter
+    
+    db = firestore.client()
+    chunks_ref = db.collection("document_chunks")
+    docs = chunks_ref.where(
+        filter=FieldFilter("user_email", "==", user_email)
+    ).where(
+        filter=FieldFilter("filename", "==", filename)
+    ).stream()
+    
+    batch = db.batch()
+    deleted_count = 0
+    for doc in docs:
+        batch.delete(doc.reference)
+        deleted_count += 1
+        if deleted_count % 400 == 0:
+            batch.commit()
+            batch = db.batch()
+    if deleted_count % 400 != 0:
+        batch.commit()
+        
+    if deleted_count > 0:
+        print(f"[SCRAPE] Wiped {deleted_count} existing chunks for {filename} to prevent duplication.")
+
     # --- Chunk & save to Firestore ---
     chunk_count = chunk_and_save(
         text=text,

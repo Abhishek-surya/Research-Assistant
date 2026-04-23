@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../../config/firebase';
 import { API_BASE_URL } from '../../config/api';
-import { FileText, Globe, Loader2, Trash2 } from 'lucide-react';
+import { FileText, Globe, Loader2, Trash2, RefreshCw } from 'lucide-react';
 
 const DocumentWidget = ({ refreshTrigger }) => {
   const [documents, setDocuments] = useState([]);
@@ -12,18 +12,19 @@ const DocumentWidget = ({ refreshTrigger }) => {
     if (!silent) setLoading(true);
     try {
       const token = await auth.currentUser?.getIdToken();
-      if (!token) return;
-      const response = await fetch(`${API_BASE_URL}/documents`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error('Failed to fetch');
-      const data = await response.json();
-      setDocuments(data.documents || []);
+      if (token) {
+        const response = await fetch(`${API_BASE_URL}/documents`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setDocuments(data.documents || []);
+        }
+      }
     } catch (err) {
-      setDocuments([]);
       console.error('Failed to fetch documents:', err);
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -31,16 +32,20 @@ const DocumentWidget = ({ refreshTrigger }) => {
     if (auth.currentUser) fetchDocuments();
   }, [refreshTrigger]);
 
-  // Auto-poll every 10 seconds if any documents are still processing
+  // Restart auto-polling ONLY if there are processing documents to save Read quota
   useEffect(() => {
     let interval;
-    const isProcessing = documents.some(d => d.status === 'processing');
-    if (isProcessing) {
+    const hasProcessing = documents.some(doc => doc.status === 'processing');
+    
+    if (hasProcessing) {
       interval = setInterval(() => {
         fetchDocuments(true); // silent refresh
-      }, 10000);
+      }, 30000); // 30 second safety interval
     }
-    return () => clearInterval(interval);
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [documents]);
 
   const handleDelete = async (filename) => {
@@ -63,8 +68,14 @@ const DocumentWidget = ({ refreshTrigger }) => {
     }
   };
 
-  const pdfDocs = documents.filter(d => d.type !== 'web');
-  const webDocs = documents.filter(d => d.type === 'web');
+  // Filter out metadata files like .summary.md, maintaining only actual PDFs and web links
+  const validDocuments = documents.filter(d => {
+    if (d.type === 'web') return true;
+    return d.filename && d.filename.toLowerCase().endsWith('.pdf');
+  });
+
+  const pdfDocs = validDocuments.filter(d => d.type !== 'web');
+  const webDocs = validDocuments.filter(d => d.type === 'web');
 
   const renderDocList = (docs) => (
     <div className="document-list" style={{ marginBottom: '0.75rem' }}>
@@ -76,6 +87,11 @@ const DocumentWidget = ({ refreshTrigger }) => {
           {doc.status === 'processing' && (
             <span className="processing-badge" title="Embedding chunks in background...">
               <Loader2 size={12} className="spin" />
+            </span>
+          )}
+          {doc.status === 'error' && (
+            <span className="error-badge" title="Vector embedding failed (API Limit Exceeded or Error). Please delete and try again." style={{ color: '#ef4444', marginLeft: 'auto', marginRight: '8px' }}>
+              ⚠️
             </span>
           )}
           <button
@@ -95,7 +111,18 @@ const DocumentWidget = ({ refreshTrigger }) => {
 
   return (
     <div className="document-widget">
-      <h3 className="widget-title">Knowledge Base</h3>
+      <div className="widget-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+        <h3 className="widget-title" style={{ margin: 0 }}>Knowledge Base</h3>
+        <button 
+          onClick={() => fetchDocuments()} 
+          disabled={loading}
+          className="refresh-btn"
+          title="Manual Refresh"
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+        >
+          <RefreshCw size={14} className={loading ? 'spin' : ''} />
+        </button>
+      </div>
       {loading ? (
         <div className="loader-center" style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}><Loader2 className="spin" size={16} /></div>
       ) : documents.length === 0 ? (

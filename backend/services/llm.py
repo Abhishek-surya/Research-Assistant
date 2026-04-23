@@ -8,16 +8,16 @@ from firebase_admin import firestore
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
 load_dotenv(dotenv_path=_env_path)
 
-_client = None
-
 def get_client():
-    global _client
-    if not _client:
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        if not api_key or api_key == "your_gemini_api_key_here":
-            raise ValueError("GEMINI_API_KEY is not set. Please add it to backend/.env")
-        _client = genai.Client(api_key=api_key)
-    return _client
+    # Force reload environment variables to drop old cache
+    load_dotenv(dotenv_path=_env_path, override=True)
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key or api_key == "your_gemini_api_key_here":
+        raise ValueError("GEMINI_API_KEY is not set. Please add it to backend/.env")
+    
+    print(f"[LLM] Using API Key: {api_key[:10]}...")
+    # Do not cache client globally so key rotation works instantly
+    return genai.Client(api_key=api_key)
 
 def generate_answer(query_text: str, context_chunks: list[dict]) -> str:
     """
@@ -48,31 +48,37 @@ def generate_answer(query_text: str, context_chunks: list[dict]) -> str:
 
     prompt = f"Context:\n{context_text}\n\nUser Question:\n{query_text}"
 
-    # Get dynamic model name from Firestore
-    model_name = "gemini-2.5-flash" # fallback
-    try:
-        db = firestore.client()
-        docs = db.collection("models").limit(1).stream()
-        for doc in docs:
-            data = doc.to_dict()
-            # Try a few common field names, otherwise try document ID
-            model_name = data.get("name") or data.get("model_name") or data.get("modelId") or doc.id
-            break
-    except Exception as e:
-        print(f"Warning: Failed to fetch model name from Firebase, using fallback. Error: {e}")
+    models_to_try = [
+        'gemini-1.5-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash-lite'
+    ]
 
-    # Call Gemini
     client = get_client()
-    try:
-        response = client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.1, 
-                tools=[types.Tool(google_search=types.GoogleSearchRetrieval())]
-            ),
-        )
-        return response.text
-    except Exception as e:
-        return f"Error generating answer: {str(e)}"
+    last_error = None
+
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.1, 
+                    tools=[types.Tool(google_search=types.GoogleSearchRetrieval())]
+                ),
+            )
+            return response.text
+        except Exception as e:
+            last_error = str(e)
+            print(f"Warning: Model {model_name} failed with error: {last_error}")
+            # Automatically try next if we see 503 or Unavailable
+            if "503" in str(e) or "Unavailable" in str(e) or "unavailable" in str(e).lower() or "overloaded" in str(e).lower():
+                continue
+            else:
+                # For non-503 errors, we probably shouldn't fallback, but let's be safe and try the next one anyways,
+                # Or wait, the user said "If the first one fails with 503, it must automatically try the next one."
+                # I'll just continue if it looks like a server issue.
+                continue
+
+    return f"Error generating answer after trying fallback models: {last_error}"

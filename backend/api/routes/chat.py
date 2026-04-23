@@ -39,38 +39,49 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
 
     try:
         query_embedding = generate_embedding(query_for_search)
+        if not query_embedding or len(query_embedding) == 0:
+            raise ValueError("Embedding model returned an empty vector.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to embed query: {str(e)}")
 
     from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 
-    # 2. Fetch nearest chunks using native Firestore Vector Search
     db = firestore.client()
     chunks_ref = db.collection("document_chunks")
     
-    # Apply vector search on filtered collection. 
-    # Similarity Threshold 0.35 means max COSINE distance is 0.65
+    top_chunks = []
+    
+    active_filename = payload.attachment_meta.get("name") if payload.attachment_meta else None
+
+    # Use targeted Vector Search even for specific files to save reads
+    # (1 query read + 1 read per result instead of 200+ reads for a large file)
     vector_query = chunks_ref.where(
         filter=FieldFilter("user_email", "==", user_email)
     ).where(
         filter=FieldFilter("status", "==", "processed")
-    ).find_nearest(
+    )
+    
+    if active_filename:
+        vector_query = vector_query.where(filter=FieldFilter("filename", "==", active_filename))
+
+    vector_query = vector_query.find_nearest(
         vector_field="embedding",
         query_vector=query_embedding,
         distance_measure=DistanceMeasure.COSINE,
-        limit=5,
-        distance_threshold=0.65,
+        limit=3,
+        distance_threshold=0.65, # Higher threshold for better relevance
         distance_result_field="vector_distance"
     )
+    
     docs = vector_query.stream()
+    scored_chunks = []
 
-    top_chunks = []
     for doc in docs:
         data = doc.to_dict()
         distance = data.get("vector_distance", 1.0)
-        similarity_score = 1.0 - distance
+        similarity_score = float(1.0 - distance)
         
-        top_chunks.append({
+        scored_chunks.append({
             "id": doc.id,
             "text": data.get("text", ""),
             "document_name": data.get("document_name", "Unknown"),
@@ -80,6 +91,8 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
             "score": similarity_score,
             "doc_type": data.get("doc_type", "pdf")
         })
+    
+    top_chunks = scored_chunks[:3]
 
     # 5. Generate Answer using Gemini LLM
     llm_reply = generate_answer(query_for_search, top_chunks)

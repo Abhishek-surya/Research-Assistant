@@ -9,6 +9,11 @@ router = APIRouter()
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
 
 
+import time
+
+_processing_cache = {}
+CACHE_TTL = 5  # seconds (Lowered for snappier UI refreshes)
+
 @router.get("/documents")
 async def list_documents(user_token: dict = Depends(verify_token)):
     user_email = user_token.get("email")
@@ -20,19 +25,39 @@ async def list_documents(user_token: dict = Depends(verify_token)):
     if not os.path.exists(user_dir):
         return {"documents": []}
 
-    # Identify files that are still processing
-    db = firestore.client()
-    chunks_ref = db.collection("document_chunks")
+    # Identify files that are still processing (Cache to prevent read quota burn)
+    now = time.time()
     processing_filenames = set()
+    failed_filenames = set()
     
-    # Query chunks that haven't been embedded yet
-    for status in ["new", "embedding_failed"]:
-        docs = chunks_ref.where(filter=FieldFilter("user_email", "==", user_email)).where(filter=FieldFilter("status", "==", status)).stream()
+    if user_email in _processing_cache and (now - _processing_cache[user_email]["time"] < CACHE_TTL):
+        processing_filenames = _processing_cache[user_email].get("processing", set())
+        failed_filenames = _processing_cache[user_email].get("failed", set())
+    else:
+        db = firestore.client()
+        chunks_ref = db.collection("document_chunks")
+        
+        # Indexed query to find chunks still processing
+        docs = chunks_ref.where(filter=FieldFilter("user_email", "==", user_email)).where(filter=FieldFilter("status", "==", "new")).stream()
         for doc in docs:
             data = doc.to_dict()
             fn = data.get("filename") or data.get("document_name")
             if fn:
                 processing_filenames.add(fn)
+                
+        # Indexed query to find chunks that failed embedding
+        docs_failed = chunks_ref.where(filter=FieldFilter("user_email", "==", user_email)).where(filter=FieldFilter("status", "==", "embedding_failed")).stream()
+        for doc in docs_failed:
+            data = doc.to_dict()
+            fn = data.get("filename") or data.get("document_name")
+            if fn:
+                failed_filenames.add(fn)
+        
+        _processing_cache[user_email] = {
+            "time": now,
+            "processing": processing_filenames,
+            "failed": failed_filenames
+        }
 
     documents = []
     for filename in os.listdir(user_dir):
@@ -59,6 +84,12 @@ async def list_documents(user_token: dict = Depends(verify_token)):
         else:
             doc_type = "text"
 
+        status = "ready"
+        if filename in failed_filenames:
+            status = "error"
+        elif filename in processing_filenames:
+            status = "processing"
+
         documents.append({
             "name": doc_title or filename,
             "filename": filename,
@@ -66,7 +97,7 @@ async def list_documents(user_token: dict = Depends(verify_token)):
             "source_url": source_url,
             "size": stat.st_size,
             "created": stat.st_mtime,
-            "status": "processing" if filename in processing_filenames else "ready"
+            "status": status
         })
 
     documents.sort(key=lambda x: x["created"], reverse=True)
@@ -78,6 +109,9 @@ async def delete_document(filename: str, user_token: dict = Depends(verify_token
     user_email = user_token.get("email")
     if not user_email:
         raise HTTPException(status_code=400, detail="User email not found in token")
+
+    # Invalidate the processing status cache for this user
+    _processing_cache.pop(user_email, None)
 
     # 1. Delete the local file
     filepath = os.path.join(DATA_DIR, user_email, filename)

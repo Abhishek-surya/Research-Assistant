@@ -4,12 +4,13 @@ import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDLo966LU3zgfyHwwYxg7EbfXRi_9OQoW0",
-  authDomain: "abhishek-rag-2026.firebaseapp.com",
-  projectId: "abhishek-rag-2026",
-  storageBucket: "abhishek-rag-2026.firebasestorage.app",
-  messagingSenderId: "913577611628",
-  appId: "1:913577611628:web:b0f7b693ec8520117aa349"
+  apiKey: "AIzaSyBW6HTppe51XDcCwX4HqhqU3FzfFG0PGtE",
+  authDomain: "ai-research-assistant-3d978.firebaseapp.com",
+  projectId: "ai-research-assistant-3d978",
+  storageBucket: "ai-research-assistant-3d978.firebasestorage.app",
+  messagingSenderId: "834085330184",
+  appId: "1:834085330184:web:b05201c9a039da1e2aa0bd",
+  measurementId: "G-M5VGCXMCYP"
 };
 
 // Initialize Firebase
