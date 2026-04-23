@@ -72,6 +72,7 @@ async def get_session_messages(session_id: str, user_token: dict = Depends(verif
         messages.append({
             "query": data.get("query", ""),
             "reply": data.get("reply", ""),
+            "sources": data.get("sources", []),
             "attachment": data.get("attachment"),
             "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
         })

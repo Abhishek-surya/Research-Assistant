@@ -13,7 +13,7 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.
 import time
 
 _processing_cache = {}
-CACHE_TTL = 5  # seconds (Lowered for snappier UI refreshes)
+CACHE_TTL = 30  # seconds — check embedding status at most once per 30s to save quota
 
 @router.get("/documents")
 async def list_documents(user_token: dict = Depends(verify_token)):
@@ -131,28 +131,40 @@ async def delete_document(filename: str, user_token: dict = Depends(verify_token
 
     deleted_count = 0
     batch = db.batch()
-    
-    # Use single-field query (no composite index needed) then filter in Python
-    # This avoids composite index build-time race conditions entirely
-    print(f"[DELETE] Searching chunks: user={user_email}, filename={filename}")
-    all_user_chunks = chunks_ref.where(filter=FieldFilter("user_email", "==", user_email)).stream()
-    for doc in all_user_chunks:
+
+    # Targeted query: filter by BOTH user_email AND filename — no full-collection scan.
+    # This requires the composite index (user_email, filename) to exist in Firestore.
+    print(f"[DELETE] Targeted chunk query: user={user_email}, filename={filename}")
+    targeted_chunks = (
+        chunks_ref
+        .where(filter=FieldFilter("user_email", "==", user_email))
+        .where(filter=FieldFilter("filename", "==", filename))
+        .stream()
+    )
+    for doc in targeted_chunks:
+        batch.delete(doc.reference)
+        deleted_count += 1
+        if deleted_count % 400 == 0:
+            batch.commit()
+            batch = db.batch()
+
+    # Also clean up any old chunks stored under document_name instead of filename
+    name_chunks = (
+        chunks_ref
+        .where(filter=FieldFilter("user_email", "==", user_email))
+        .where(filter=FieldFilter("document_name", "==", filename))
+        .stream()
+    )
+    for doc in name_chunks:
         data = doc.to_dict()
-        stored_filename = data.get("filename", "")
-        stored_doc_name = data.get("document_name", "")
-        # Match the dedicated filename field OR document_name (fallback for old chunks without filename)
-        if stored_filename == filename or stored_doc_name == filename:
+        if data.get("filename", "") != filename:  # Avoid double-deleting
             batch.delete(doc.reference)
             deleted_count += 1
-            print(f"  ⏳ Queued chunk {doc.id[:20]} for deletion")
-            
-            # Firestore limit: 499 operations per batch, flush when reaching 400 for safety
             if deleted_count % 400 == 0:
                 batch.commit()
                 batch = db.batch()
 
-    # Commit any remaining deletes in the batch
-    if deleted_count % 400 != 0:
+    if deleted_count % 400 != 0 or deleted_count == 0:
         batch.commit()
 
     print(f"[DELETE] Total deleted: {deleted_count} chunks")
@@ -162,3 +174,4 @@ async def delete_document(filename: str, user_token: dict = Depends(verify_token
         "filename": filename,
         "chunks_deleted": deleted_count
     }
+

@@ -84,6 +84,7 @@ function App() {
           id: `${sessionId}-a-${idx}`, 
           sender: 'ai', 
           text: turn.reply || 'No response recorded.',
+          contextChunks: turn.sources || [],
           isLoading: false 
         });
       });
@@ -154,7 +155,11 @@ function App() {
           message: text || '', 
           session_id: activeSessionId,
           active_context: attachment ? attachment.text : null,
-          attachment_meta: attachment ? { name: attachment.name, type: attachment.type } : null
+          attachment_meta: attachment ? { 
+            name: attachment.name, 
+            type: attachment.type,
+            filename: attachment.filename || attachment.name  // Use real Firestore filename for URL scrapes
+          } : null
         })
       });
 
