@@ -22,9 +22,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from services.embedding_scheduler import process_pending_chunks
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize critical services
@@ -35,16 +32,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Failed to initialize Firebase: {e}")
     
-    scheduler = BackgroundScheduler()
-    # Runs quietly in background...
-    scheduler.add_job(process_pending_chunks, "interval", minutes=2)
-    scheduler.start()
-    logger.info("✅ APScheduler started for background embedding.")
-    
     yield
     # Shutdown logic
     logger.info("🛑 [SHUTDOWN] Application shutting down.")
-    scheduler.shutdown()
 
 app = FastAPI(
     title="AI Research Assistant API",
