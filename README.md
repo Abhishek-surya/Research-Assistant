@@ -21,6 +21,11 @@ A high-performance AI Research Assistant built with a specialized RAG (Retrieval
   - **Generation**: Google Gemini 1.5 Flash.
   - **Embeddings**: HuggingFace `sentence-transformers/all-MiniLM-L6-v2`.
 
+## 🔗 Real-Time Deployment
+
+- **Frontend**: [https://ai-research-assistant-3d978.web.app](https://ai-research-assistant-3d978.web.app)
+- **Backend API**: [https://ai-research-assistant-backend-newa.onrender.com](https://ai-research-assistant-backend-newa.onrender.com)
+
 ## ⚙️ Configuration
 
 Create a `backend/.env` file with the following:
@@ -49,4 +54,4 @@ HF_API_TOKEN=your_huggingface_token
 - **Firestore**: Requires custom vector index configuration for `document_chunks`.
 
 ---
-*Created with ❤️ by Antigravity AI*
+*Created with ❤️*
