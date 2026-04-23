@@ -11,3 +11,4 @@ google-genai
 python-dotenv
 apscheduler
 huggingface_hub
+numpy
