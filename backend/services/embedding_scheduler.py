@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.vector import Vector
-from services.embedder import generate_embedding, generate_embeddings_batch
+from services.embedder import generate_embeddings_batch
 
 logger = logging.getLogger(__name__)
 

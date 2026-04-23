@@ -9,6 +9,5 @@ lxml
 langchain-text-splitters
 google-genai
 python-dotenv
-apscheduler
 huggingface_hub
 numpy
