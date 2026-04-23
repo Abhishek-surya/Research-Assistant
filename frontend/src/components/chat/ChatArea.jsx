@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Paperclip, Loader2, FileText, Link as LinkIcon, X, Globe, Info } from 'lucide-react';
+import { Send, Sparkles, Paperclip, Loader2, FileText, Link as LinkIcon, Globe, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { auth } from '../../config/firebase';
 import { API_BASE_URL } from '../../config/api';
@@ -11,7 +11,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
   const [urlInput, setUrlInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [activeDebugId, setActiveDebugId] = useState(null);
+  const [activeDebugId, setActiveDebugId] = useState(null); // kept for future debug use
 
   const endOfMessagesRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -38,7 +38,7 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Upload failed');
-      setAttachment({ name: file.name, text: data.text, type: 'file' });
+      setAttachment({ name: file.name, filename: file.name, type: 'file', text: null });
       
       // Signal sidebar to refresh the documents list
       if (onDocumentAdded) onDocumentAdded();
@@ -71,7 +71,14 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Scraping failed');
       
-      setAttachment({ name: data.title || urlInput, text: data.text, url: data.url, type: 'link' });
+      // Store only lightweight metadata — NOT the full text to avoid React state crash
+      setAttachment({ 
+        name: data.title || urlInput, 
+        url: data.url || urlInput,
+        filename: data.filename,   // The sanitized filename used in Firestore (e.g. www_example_com.html)
+        type: 'link',
+        text: null  
+      });
       setUrlInput('');
       
       // Signal sidebar to refresh the documents list
@@ -150,42 +157,58 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
                 )}
                 {msg.isLoading && <span className="typing-indicator"><span>.</span><span>.</span><span>.</span></span>}
                 
-                {/* Debug UI for Context Chunks */}
-                {msg.contextChunks && msg.contextChunks.length > 0 && (
-                  <div className="debug-container">
-                    <button 
-                      className="info-btn"
-                      onClick={() => setActiveDebugId(activeDebugId === msg.id ? null : msg.id)}
-                      title="View Retrieved Context"
-                    >
-                      <Info size={14} />
-                      <span>Sources ({msg.contextChunks.length})</span>
-                    </button>
-                    
-                    {activeDebugId === msg.id && (
-                      <div className="debug-panel glass-panel">
-                        <div className="debug-header">
-                          <h4>Retrieved Context Chunks</h4>
-                          <button onClick={() => setActiveDebugId(null)}><X size={14} /></button>
-                        </div>
-                        <div className="chunks-list">
-                          {msg.contextChunks.map((chunk, idx) => (
-                            <div key={idx} className="chunk-card">
-                              <div className="chunk-meta">
-                                <span className="chunk-source">
-                                  {chunk.doc_type === 'web' ? <Globe size={12}/> : <FileText size={12}/>}
-                                  {chunk.document_name}
-                                </span>
-                                <span className="chunk-score">Score: {chunk.score.toFixed(3)}</span>
-                              </div>
-                              <p className="chunk-text">"{chunk.text}"</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Clean Source Citations — deduplicated by document name */}
+                {msg.sender === 'ai' && !msg.isLoading && msg.contextChunks && msg.contextChunks.length > 0 && (() => {
+                  // Deduplicate on the frontend as a safety net for old/cached messages
+                  const seen = new Set();
+                  const uniqueSources = msg.contextChunks.filter(s => {
+                    const key = s.document_name;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                  });
+                  return (
+                    <div className="source-citations">
+                      <span className="source-label">Sources:</span>
+                      {uniqueSources.map((source, idx) => {
+                        // Only treat as web if explicitly doc_type='web' with a real source_url
+                        const isWeb = source.doc_type === 'web' && source.source_url;
+                        const isGoogle = source.is_google;
+                        
+                        if (isGoogle) {
+                          return (
+                            <span key={idx} className="source-tag source-tag--web">
+                              <Globe size={11} />
+                              Google Search
+                            </span>
+                          );
+                        }
+                        if (isWeb) {
+                          return (
+                            <a 
+                              key={idx} 
+                              className="source-tag source-tag--web" 
+                              href={source.source_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              title={source.source_url}
+                            >
+                              <Globe size={11} />
+                              {source.source_url}
+                            </a>
+                          );
+                        }
+                        // Default: PDF or text document — always show doc pill
+                        return (
+                          <span key={idx} className="source-tag source-tag--doc" title={source.document_name}>
+                            <FileText size={11} />
+                            {source.document_name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}
