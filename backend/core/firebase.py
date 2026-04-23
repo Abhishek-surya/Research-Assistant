@@ -22,4 +22,7 @@ def init_firebase():
             else:
                 raise FileNotFoundError(f"Service account key not found at {cert_path} and FIREBASE_SERVICE_ACCOUNT_JSON is not set.")
 
-        firebase_admin.initialize_app(cred)
+        project_id = os.environ.get('FIREBASE_PROJECT_ID', 'ai-research-assistant-3d978')
+        firebase_admin.initialize_app(cred, {
+            'projectId': project_id
+        })
