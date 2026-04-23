@@ -60,6 +60,9 @@ function App() {
   // Load messages for an old session when user clicks sidebar item
   const handleSelectSession = async (sessionId) => {
     if (sessionId === activeSessionId) return;
+    setSessionsLoading(true);
+    // Clear screen while loading
+    setMessages([]);
     try {
       const token = await auth.currentUser.getIdToken();
       const res = await fetch(`${API_BASE_URL}/chats/${sessionId}`, {
@@ -70,20 +73,28 @@ function App() {
 
       // Reconstruct messages array from Q&A turns
       const loaded = [];
-      data.messages.forEach((turn, idx) => {
+      (data.messages || []).forEach((turn, idx) => {
         loaded.push({ 
           id: `${sessionId}-q-${idx}`, 
           sender: 'user', 
-          text: turn.query,
-          attachment: turn.attachment // Restore the attachment badge
+          text: turn.query || '',
+          attachment: turn.attachment || null 
         });
-        loaded.push({ id: `${sessionId}-a-${idx}`, sender: 'ai', text: turn.reply });
+        loaded.push({ 
+          id: `${sessionId}-a-${idx}`, 
+          sender: 'ai', 
+          text: turn.reply || 'No response recorded.',
+          isLoading: false 
+        });
       });
 
       setMessages(loaded.length > 0 ? loaded : [WELCOME_MSG]);
       setActiveSessionId(sessionId);
     } catch (err) {
       console.error('Failed to load session messages:', err);
+      setMessages([WELCOME_MSG]);
+    } finally {
+      setSessionsLoading(false);
     }
   };
 
@@ -119,9 +130,6 @@ function App() {
   };
 
   const handleSendMessage = async (text, attachment = null) => {
-    // No longer joining text and attachment.text here. 
-    // The backend will handle the context separately.
-
     const userMsg = {
       id: Date.now().toString(),
       sender: 'user',
@@ -159,7 +167,6 @@ function App() {
       // Persist the session_id returned by the backend
       if (data.session_id && !activeSessionId) {
         setActiveSessionId(data.session_id);
-        // Refresh sidebar to include the new session
         fetchSessions();
       }
 
@@ -169,7 +176,8 @@ function App() {
               id: loadingId,
               sender: 'ai',
               text: data.reply,
-              contextChunks: data.context_chunks || []
+              contextChunks: data.context_chunks || [],
+              isLoading: false // Explicitly kill loading state
             }
           : msg
       ));
@@ -177,7 +185,7 @@ function App() {
       console.error('Chat error:', error);
       setMessages(prev => prev.map(msg =>
         msg.id === loadingId
-          ? { id: loadingId, sender: 'ai', text: `Error: ${error.message}` }
+          ? { id: loadingId, sender: 'ai', text: `Error: ${error.message}`, isLoading: false }
           : msg
       ));
     }

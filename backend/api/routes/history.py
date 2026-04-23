@@ -24,7 +24,7 @@ async def get_chat_sessions(user_token: dict = Depends(verify_token)):
         db.collection("chat_history")
         .where(filter=FieldFilter("user_email", "==", user_email))
         .order_by("timestamp", direction=firestore.Query.DESCENDING)
-        .limit(150)
+        .limit(50)
         .stream()
     )
 
@@ -60,7 +60,8 @@ async def get_session_messages(session_id: str, user_token: dict = Depends(verif
         db.collection("chat_history")
         .where(filter=FieldFilter("user_email", "==", user_email))
         .where(filter=FieldFilter("session_id", "==", session_id))
-        .order_by("timestamp", direction=firestore.Query.ASCENDING)
+        .order_by("timestamp", direction=firestore.Query.DESCENDING)
+        .limit(20)
         .stream()
     )
 
@@ -75,6 +76,8 @@ async def get_session_messages(session_id: str, user_token: dict = Depends(verif
             "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
         })
 
+    # Reverse to restore chronological order (oldest first)
+    messages.reverse()
     return {"messages": messages}
 
 @router.delete("/chats/{session_id}")

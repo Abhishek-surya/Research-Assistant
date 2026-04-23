@@ -33,9 +33,10 @@
       "fields": [
         { "fieldPath": "user_email", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "filename", "order": "ASCENDING" },
         {
           "fieldPath": "embedding",
-          "vectorConfig": { "dimension": 1536, "flat": {} }
+          "vectorConfig": { "dimension": 384, "flat": {} }
         }
       ]
     },
