@@ -15,6 +15,17 @@ import time
 _processing_cache = {}
 CACHE_TTL = 30  # seconds — check embedding status at most once per 30s to save quota
 
+@router.post("/documents/sync")
+async def force_sync(user_token: dict = Depends(verify_token)):
+    """Bust the server-side processing cache for this user, forcing a fresh status check."""
+    user_email = user_token.get("email")
+    if not user_email:
+        raise HTTPException(status_code=400, detail="User email not found in token")
+    _processing_cache.pop(user_email, None)
+    return {"message": "Cache cleared. Next refresh will re-scan document status."}
+
+
+
 @router.get("/documents")
 async def list_documents(user_token: dict = Depends(verify_token)):
     user_email = user_token.get("email")
