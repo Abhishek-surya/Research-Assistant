@@ -7,6 +7,7 @@ const DocumentWidget = ({ refreshTrigger }) => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingFile, setDeletingFile] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchDocuments = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -48,6 +49,24 @@ const DocumentWidget = ({ refreshTrigger }) => {
     };
   }, [documents]);
 
+  const forceSync = async () => {
+    setSyncing(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      // Hit the sync endpoint to bust the server-side processing cache
+      await fetch(`${API_BASE_URL}/documents/sync`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.warn('Force sync cache clear failed (non-critical):', err);
+    } finally {
+      // Always do a fresh fetch regardless
+      await fetchDocuments(false);
+      setSyncing(false);
+    }
+  };
+
   const handleDelete = async (filename) => {
     if (!window.confirm(`Delete "${filename}" and all its chunks?`)) return;
     setDeletingFile(filename);
@@ -59,11 +78,7 @@ const DocumentWidget = ({ refreshTrigger }) => {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Delete failed');
-      
-      // Update UI state instantly
       setDocuments(prev => prev.filter(d => d.filename !== filename));
-      
-      // Background refresh for total sync
       fetchDocuments(true);
     } catch (err) {
       alert('Delete failed: ' + err.message);
@@ -117,15 +132,26 @@ const DocumentWidget = ({ refreshTrigger }) => {
     <div className="document-widget">
       <div className="widget-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <h3 className="widget-title" style={{ margin: 0 }}>Knowledge Base</h3>
-        <button 
-          onClick={() => fetchDocuments()} 
-          disabled={loading}
-          className="refresh-btn"
-          title="Manual Refresh"
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-        >
-          <RefreshCw size={14} className={loading ? 'spin' : ''} />
-        </button>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button
+            onClick={forceSync}
+            disabled={syncing || loading}
+            className="refresh-btn"
+            title="Force Sync — clears stuck 'Processing' states"
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', fontSize: '10px' }}
+          >
+            {syncing ? <Loader2 size={14} className="spin" /> : '⚡'}
+          </button>
+          <button
+            onClick={() => fetchDocuments()}
+            disabled={loading}
+            className="refresh-btn"
+            title="Refresh document list"
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+          >
+            <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          </button>
+        </div>
       </div>
       {loading ? (
         <div className="loader-center" style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}><Loader2 className="spin" size={16} /></div>

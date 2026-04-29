@@ -156,11 +156,21 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
     }
     is_summary_query = any(kw in user_query.lower() for kw in SUMMARIZE_KEYWORDS)
 
-    if active_filename:
-        # ── PATH A: Explicit document attached ───────────────────────────────
-        # Python-side filtering — no composite index needed.
-        print(f"[CHAT] PATH A | file='{active_filename}' | summary={is_summary_query}")
+    # Compute factual signals EARLY so PATH B keyword matching can respect them
+    # Queries with these signals should NEVER be answered from a loosely-matched local PDF.
+    # They must go to vector search first, then Google Search if that also fails.
+    FACTUAL_SIGNAL_WORDS = {
+        "current", "latest", "today", "now", "recent", "news", "price",
+        "stock", "weather", "rate", "who is the", "pm of", "president of",
+        "ceo of", "population of", "capital of", "inflation", "gdp",
+        "score", "match", "result", "election", "war", "update"
+    }
+    q_lower_full = user_query.lower().strip()
+    has_factual_signal = any(sig in q_lower_full for sig in FACTUAL_SIGNAL_WORDS)
 
+    if active_filename:
+        # ── PATH A: Explicit document attached ─────────────────────────────
+        print(f"[CHAT] PATH A | file='{active_filename}' | summary={is_summary_query}")
         all_user_chunks = fetch_user_chunks(chunks_ref, user_email, limit=60)
         candidate_chunks = [
             c for c in all_user_chunks if c.get("filename") == active_filename
@@ -170,24 +180,19 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
         print(f"[CHAT] PATH A | found {len(top_chunks)}/{len(candidate_chunks)} chunks")
 
     else:
-        # ── PATH B: No explicit attachment — smart auto-search ───────────────
-        # Layer 1: Fetch all user chunks once (single-field query, cheap)
-        # Layer 2: Keyword-to-filename matching (find the right doc from query text)
-        # Layer 3: Vector similarity fallback if no keyword match
-        # Layer 4: Most-recent-doc fallback for bare "summarize this"
+        # ── PATH B: No explicit attachment — smart auto-search ──────────────
         print(f"[CHAT] PATH B | keywords={keywords} | summary={is_summary_query}")
-
         all_user_chunks = fetch_user_chunks(chunks_ref, user_email, limit=60)
 
         if not all_user_chunks:
-            # User has no processed documents at all
             top_chunks = []
         else:
-            # Layer 2: keyword → filename match
             matched_filename = find_best_filename_match(all_user_chunks, keywords)
 
-            if matched_filename:
-                # Found a document that matches query keywords — use it
+            # KEY FIX: If the query has factual signals (real-world people/events/prices),
+            # skip keyword-to-filename matching ENTIRELY.
+            # A PDF called 'india_investment.pdf' should NOT absorb 'Who is PM of India?'
+            if matched_filename and not has_factual_signal:
                 print(f"[CHAT] PATH B | keyword match → '{matched_filename}'")
                 candidate_chunks = [
                     c for c in all_user_chunks if c.get("filename") == matched_filename
@@ -196,15 +201,12 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
                 top_chunks = candidate_chunks[:5]
 
             elif is_summary_query and not keywords:
-                # Layer 4: "summarize this" with no keywords → use most recent doc
                 print(f"[CHAT] PATH B | bare summarize → most recent doc")
-                # Sort by created_at descending
                 sorted_chunks = sorted(
                     all_user_chunks,
                     key=lambda c: c.get("created_at") or datetime.min.replace(tzinfo=timezone.utc),
                     reverse=True
                 )
-                # Get the filename of the most recently uploaded chunk
                 if sorted_chunks:
                     recent_filename = sorted_chunks[0].get("filename")
                     candidate_chunks = [
@@ -214,7 +216,6 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
                     top_chunks = candidate_chunks[:5]
 
             else:
-                # Layer 3: Vector similarity across entire knowledge base
                 print(f"[CHAT] PATH B | vector search across all user docs")
                 try:
                     for doc in (
@@ -226,7 +227,7 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
                             query_vector=query_embedding,
                             distance_measure=DistanceMeasure.COSINE,
                             limit=5,
-                            distance_threshold=0.35,
+                            distance_threshold=0.18,  # score >= 0.82
                             distance_result_field="vector_distance"
                         )
                         .stream()
@@ -243,30 +244,85 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
                             "doc_type": data.get("doc_type", "pdf")
                         })
                 except Exception as e:
-                    print(f"[CHAT] PATH B vector search failed: {e}, using keyword fallback")
-                    # Fallback: return first 5 chunks from any user doc
-                    top_chunks = all_user_chunks[:5]
+                    print(f"[CHAT] PATH B vector search failed: {e}")
+                    # Only fall back to local chunks for non-factual queries
+                    # Factual queries should go to Google Search, not get random PDF chunks
+                    if not has_factual_signal:
+                        top_chunks = all_user_chunks[:5]
 
         print(f"[CHAT] PATH B | returning {len(top_chunks)} chunks")
 
-    # ── Generate LLM answer ──────────────────────────────────────────────────
-    llm_reply = generate_answer(query_for_search, top_chunks)
+    # ── Quality gate: score >= 0.82 required for verified sources ─────────────
+    SCORE_THRESHOLD = 0.82
+    quality_chunks = [c for c in top_chunks if c.get("score", 0.0) >= SCORE_THRESHOLD]
+    print(f"[CHAT] quality_chunks={len(quality_chunks)}/{len(top_chunks)} above {SCORE_THRESHOLD}")
+
+    # ── Search Gatekeeper ─────────────────────────────────────────────────────
+    # has_factual_signal already computed above (before PATH B)
+    INTERNAL_KNOWLEDGE_PATTERNS = {
+        "who are you", "what are you", "what can you do", "tell me a joke",
+        "how are you", "what is your name", "help me", "what do you do",
+        "introduce yourself", "tell me about yourself"
+    }
+    word_count = len(user_query.split())
+    is_internal_knowledge = any(
+        q_lower_full.startswith(p) or q_lower_full == p
+        for p in INTERNAL_KNOWLEDGE_PATTERNS
+    )
+
+    needs_search = (
+        not quality_chunks
+        and word_count >= 4
+        and has_factual_signal
+        and not is_internal_knowledge
+    )
+    print(f"[CHAT] needs_search={needs_search} | factual={has_factual_signal} | internal={is_internal_knowledge}")
+
+    # ── Generate LLM answer ───────────────────────────────────────────────────
+    llm_reply = generate_answer(query_for_search, quality_chunks, use_search=needs_search)
 
     # ── Build safe source citations ───────────────────────────────────────────
-    safe_sources = []
-    seen_docs = set()
-    for c in top_chunks:
-        doc_name = c.get("document_name", "Unknown Document")
-        if doc_name not in seen_docs:
+    if needs_search:
+        # WEB SEARCH MODE: source is always and only Google Search.
+        # Never allow PDF names to leak into a web-based answer.
+        safe_sources = [{"is_google": True, "document_name": "Google Search"}]
+        print(f"[CHAT] Sources: Google Search (web mode)")
+    else:
+        # DOCUMENT MODE: build sources from quality_chunks only.
+        BROAD_OVERVIEW_WORDS = {
+            "summarize", "summary", "brief", "overview",
+            "explain", "describe", "tell me about"
+        }
+        q_lower = user_query.lower()
+        is_summary = (
+            any(kw in q_lower for kw in BROAD_OVERVIEW_WORDS)
+            and len(user_query.split()) >= 3
+        )
+
+        safe_sources: list = []
+        seen_docs: set = set()
+        for c in quality_chunks:
+            doc_name = c.get("document_name", "Unknown Document")
+            if doc_name in seen_docs:
+                continue
             seen_docs.add(doc_name)
             entry = {
                 "document_name": doc_name,
                 "doc_type": c.get("doc_type", "pdf"),
+                "page_number": c.get("page_number"),
+                "is_summary": is_summary,
             }
-            # Only expose source_url for web/scraped content — not for local PDF paths
             if c.get("source_url") and c.get("doc_type") == "web":
                 entry["source_url"] = c.get("source_url")
             safe_sources.append(entry)
+
+        # Safety-net: if LLM says context not found, clear any marginal sources
+        NO_CONTEXT_PHRASES = [
+            "does not contain information", "not in the context", "context does not"
+        ]
+        if any(p in llm_reply.lower() for p in NO_CONTEXT_PHRASES):
+            print(f"[CHAT] Safety-net: clearing sources (LLM stated no context match)")
+            safe_sources = []
 
     # ── Persist to Firestore chat_history ────────────────────────────────────
     session_id = payload.session_id or str(uuid.uuid4())

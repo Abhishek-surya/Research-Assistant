@@ -157,9 +157,9 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
                 )}
                 {msg.isLoading && <span className="typing-indicator"><span>.</span><span>.</span><span>.</span></span>}
                 
-                {/* Clean Source Citations — deduplicated by document name */}
+                {/* Source Citations — intent-aware: summary = doc only, question = doc + page */}
                 {msg.sender === 'ai' && !msg.isLoading && msg.contextChunks && msg.contextChunks.length > 0 && (() => {
-                  // Deduplicate on the frontend as a safety net for old/cached messages
+                  // Deduplicate by document_name as safety net
                   const seen = new Set();
                   const uniqueSources = msg.contextChunks.filter(s => {
                     const key = s.document_name;
@@ -171,10 +171,10 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
                     <div className="source-citations">
                       <span className="source-label">Sources:</span>
                       {uniqueSources.map((source, idx) => {
-                        // Only treat as web if explicitly doc_type='web' with a real source_url
                         const isWeb = source.doc_type === 'web' && source.source_url;
                         const isGoogle = source.is_google;
-                        
+                        const isSummary = source.is_summary;
+
                         if (isGoogle) {
                           return (
                             <span key={idx} className="source-tag source-tag--web">
@@ -185,11 +185,11 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
                         }
                         if (isWeb) {
                           return (
-                            <a 
-                              key={idx} 
-                              className="source-tag source-tag--web" 
-                              href={source.source_url} 
-                              target="_blank" 
+                            <a
+                              key={idx}
+                              className="source-tag source-tag--web"
+                              href={source.source_url}
+                              target="_blank"
                               rel="noopener noreferrer"
                               title={source.source_url}
                             >
@@ -198,11 +198,16 @@ const ChatArea = ({ messages, onSendMessage, user, onDocumentAdded }) => {
                             </a>
                           );
                         }
-                        // Default: PDF or text document — always show doc pill
+                        // PDF / text doc
+                        // Summary → show only doc name (clean)
+                        // Specific question → show doc name + Page N
+                        const pageLabel = (!isSummary && source.page_number)
+                          ? ` · P.${source.page_number}`
+                          : '';
                         return (
                           <span key={idx} className="source-tag source-tag--doc" title={source.document_name}>
                             <FileText size={11} />
-                            {source.document_name}
+                            {source.document_name}{pageLabel}
                           </span>
                         );
                       })}
