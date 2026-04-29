@@ -156,17 +156,7 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
     }
     is_summary_query = any(kw in user_query.lower() for kw in SUMMARIZE_KEYWORDS)
 
-    # Compute factual signals EARLY so PATH B keyword matching can respect them
-    # Queries with these signals should NEVER be answered from a loosely-matched local PDF.
-    # They must go to vector search first, then Google Search if that also fails.
-    FACTUAL_SIGNAL_WORDS = {
-        "current", "latest", "today", "now", "recent", "news", "price",
-        "stock", "weather", "rate", "who is the", "pm of", "president of",
-        "ceo of", "population of", "capital of", "inflation", "gdp",
-        "score", "match", "result", "election", "war", "update"
-    }
     q_lower_full = user_query.lower().strip()
-    has_factual_signal = any(sig in q_lower_full for sig in FACTUAL_SIGNAL_WORDS)
 
     if active_filename:
         # ── PATH A: Explicit document attached ─────────────────────────────
@@ -189,10 +179,7 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
         else:
             matched_filename = find_best_filename_match(all_user_chunks, keywords)
 
-            # KEY FIX: If the query has factual signals (real-world people/events/prices),
-            # skip keyword-to-filename matching ENTIRELY.
-            # A PDF called 'india_investment.pdf' should NOT absorb 'Who is PM of India?'
-            if matched_filename and not has_factual_signal:
+            if matched_filename:
                 print(f"[CHAT] PATH B | keyword match → '{matched_filename}'")
                 candidate_chunks = [
                     c for c in all_user_chunks if c.get("filename") == matched_filename
@@ -245,10 +232,7 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
                         })
                 except Exception as e:
                     print(f"[CHAT] PATH B vector search failed: {e}")
-                    # Only fall back to local chunks for non-factual queries
-                    # Factual queries should go to Google Search, not get random PDF chunks
-                    if not has_factual_signal:
-                        top_chunks = all_user_chunks[:5]
+                    top_chunks = []
 
         print(f"[CHAT] PATH B | returning {len(top_chunks)} chunks")
 
@@ -258,7 +242,6 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
     print(f"[CHAT] quality_chunks={len(quality_chunks)}/{len(top_chunks)} above {SCORE_THRESHOLD}")
 
     # ── Search Gatekeeper ─────────────────────────────────────────────────────
-    # has_factual_signal already computed above (before PATH B)
     INTERNAL_KNOWLEDGE_PATTERNS = {
         "who are you", "what are you", "what can you do", "tell me a joke",
         "how are you", "what is your name", "help me", "what do you do",
@@ -270,16 +253,31 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
         for p in INTERNAL_KNOWLEDGE_PATTERNS
     )
 
+    # Universal Search Trigger with 3-word Safety Gate
     needs_search = (
         not quality_chunks
-        and word_count >= 4
-        and has_factual_signal
+        and word_count >= 3
         and not is_internal_knowledge
     )
-    print(f"[CHAT] needs_search={needs_search} | factual={has_factual_signal} | internal={is_internal_knowledge}")
+    print(f"[CHAT] needs_search={needs_search} | internal={is_internal_knowledge}")
 
     # ── Generate LLM answer ───────────────────────────────────────────────────
     llm_reply = generate_answer(query_for_search, quality_chunks, use_search=needs_search)
+
+    # ── Silent Fallback to Search ─────────────────────────────────────────────
+    NO_CONTEXT_PHRASES = [
+        "does not contain information", "not in the context", "context does not",
+        "provided context does not"
+    ]
+    
+    # If we tried to use documents but the LLM found them insufficient, 
+    # try Google Search silently (if query qualifies).
+    if not needs_search and word_count >= 3 and not is_internal_knowledge:
+        if any(p in llm_reply.lower() for p in NO_CONTEXT_PHRASES):
+            print("[CHAT] Document context rejected by LLM. Silent fallback to Google Search.")
+            needs_search = True
+            # Re-generate with search enabled
+            llm_reply = generate_answer(query_for_search, [], use_search=True)
 
     # ── Build safe source citations ───────────────────────────────────────────
     if needs_search:
@@ -316,13 +314,12 @@ async def chat_with_docs(payload: ChatRequest, user_token: dict = Depends(verify
                 entry["source_url"] = c.get("source_url")
             safe_sources.append(entry)
 
-        # Safety-net: if LLM says context not found, clear any marginal sources
-        NO_CONTEXT_PHRASES = [
-            "does not contain information", "not in the context", "context does not"
-        ]
+        # Safety-net: if LLM STILL says context not found (shouldn't happen with fallback, but just in case)
         if any(p in llm_reply.lower() for p in NO_CONTEXT_PHRASES):
             print(f"[CHAT] Safety-net: clearing sources (LLM stated no context match)")
             safe_sources = []
+            # Strip the LLM-generated sources text if it rejected it
+            llm_reply = re.sub(r"\n+---\n+\*\*Sources:\*\*.*$", "", llm_reply, flags=re.IGNORECASE).strip()
 
     # ── Persist to Firestore chat_history ────────────────────────────────────
     session_id = payload.session_id or str(uuid.uuid4())
