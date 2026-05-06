@@ -47,6 +47,20 @@ HF_API_TOKEN=your_huggingface_token
 2. `npm install`
 3. `npm run dev`
 
+## 📊 Retrieval Evaluation
+
+The backend includes an offline testing script to calculate standard Information Retrieval metrics for the RAG pipeline.
+
+- Evaluates **MRR (Mean Reciprocal Rank)**, **Precision@5**, and **Recall@5**.
+- Uses local cosine similarity calculation to evaluate existing processed chunks without requiring custom Firestore vector indexes for testing queries.
+
+To run the evaluation:
+```bash
+cd backend
+python evaluate_retrieval.py
+```
+
+
 ## 🌍 Deployment
 
 - **Frontend**: Deployed on Firebase Hosting.
