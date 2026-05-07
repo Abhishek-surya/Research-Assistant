@@ -24,7 +24,7 @@ A high-performance AI Research Assistant built with a specialized RAG (Retrieval
 ## 🔗 Real-Time Deployment
 
 - **Frontend**: [https://ai-research-assistant-3d978.web.app](https://ai-research-assistant-3d978.web.app)
-- **Backend API**: [https://ai-research-assistant-backend-newa.onrender.com](https://ai-research-assistant-backend-newa.onrender.com)
+- **Backend API**: [https://research-assistant-rt49.onrender.com](https://research-assistant-rt49.onrender.com)
 
 ## ⚙️ Configuration
 
