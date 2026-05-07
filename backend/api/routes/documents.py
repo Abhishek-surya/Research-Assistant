@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from services.embedding_scheduler import process_pending_chunks
 from api.deps import verify_token
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -16,13 +17,17 @@ _processing_cache = {}
 CACHE_TTL = 30  # seconds — check embedding status at most once per 30s to save quota
 
 @router.post("/documents/sync")
-async def force_sync(user_token: dict = Depends(verify_token)):
+async def force_sync(background_tasks: BackgroundTasks, user_token: dict = Depends(verify_token)):
     """Bust the server-side processing cache for this user, forcing a fresh status check."""
     user_email = user_token.get("email")
     if not user_email:
         raise HTTPException(status_code=400, detail="User email not found in token")
     _processing_cache.pop(user_email, None)
-    return {"message": "Cache cleared. Next refresh will re-scan document status."}
+    
+    # Re-trigger the background embedding process in case it stalled
+    background_tasks.add_task(process_pending_chunks)
+    
+    return {"message": "Cache cleared and background processing triggered."}
 
 
 

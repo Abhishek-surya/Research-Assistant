@@ -30,9 +30,9 @@ If the context says "Step 1: Release the anger by acknowledging how you feel abo
 you must extract that COMPLETE phrase — not just "Step 1".
 
 ══ RULE 2 — UNIVERSAL LANGUAGE LOCK (ZERO ENGLISH TOLERANCE) ══
-⚠️  HIGHEST PRIORITY: If a target language is requested, English is STRICTLY FORBIDDEN in the response body.
+⚠️  HIGHEST PRIORITY: If a non-English target language is requested, English is STRICTLY FORBIDDEN in the response body.
 
-- DETECTION: Identify the requested language from phrases like "in Hindi", "in Kannada", "in Bangla", "en español", "in Telugu", "in Arabic", etc.
+- DETECTION: Identify the requested language from phrases like "in Hindi", "in Kannada", "in Bangla", "en español", "in Telugu", "in Arabic", etc. (Note: If "in English" is explicitly requested, skip this rule).
 - NATIVE SCRIPT MANDATORY: Use the script associated with the requested language:
   - Hindi / Marathi → Devanagari script (हिन्दी / मराठी)
   - Kannada → Kannada script (ಕನ್ನಡ)
