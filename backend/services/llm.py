@@ -141,11 +141,11 @@ def generate_answer(query_text: str, context_chunks: list[dict], use_search: boo
     # Model chain — exact IDs as specified, no suffixes.
     # Rotates silently on 429/500; system_instruction and prompt passed to whichever is active.
     models_to_try = [
-        'gemini-3.1-flash-lite',
-        'gemini-3-flash',
-        'gemini-1.5-flash',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-3-flash-preview',
         'gemini-2.5-flash-lite',
         'gemini-2.5-flash',
+        'gemini-2.0-flash',
     ]
 
     client = get_client()
